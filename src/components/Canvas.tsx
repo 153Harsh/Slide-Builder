@@ -1,261 +1,167 @@
+import { Stage } from "react-konva";
+import { useEffect, useRef, useState } from "react";
 import {
-  Stage,
-  Layer,
-  Text,
-  Transformer,
-  Rect,
-} from "react-konva";
-
-import { useRef, useEffect } from "react";
-
+  motion,
+  AnimatePresence,
+} from "framer-motion";
 import { useEditorStore } from "../store/editorStore";
-
-import ImageElement from "./ImageElement";
+import CanvasRenderer from "../renderers/CanvasRenderer";
 
 export default function Canvas() {
   const {
     slides,
     currentSlideId,
-
-    updateElementPosition,
-    updateElementSize,
-    
-    selectedElementId,
-    selectElement,
+    selectedNodeId,
+    selectNode,
+    updateNode,
+    setActiveTransition,
+    previewMode,
     setCurrentSlide,
-previewMode,
-
+    activeTransition
   } = useEditorStore();
 
-  const currentSlide = slides.find(
-    (slide) =>
-      slide.id === currentSlideId
-  );
+  const currentSlide = slides.find((slide) => slide.id === currentSlideId);
 
-  const transformerRef = useRef<any>(null);
-
-  const selectedNodeRef = useRef<any>(null);
-
-
-
-
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [size, setSize] = useState({ width: 800, height: 600 });
 
   useEffect(() => {
-    if (
-      transformerRef.current &&
-      selectedNodeRef.current
-    ) {
-      transformerRef.current.nodes([
-        selectedNodeRef.current,
-      ]);
+    const el = containerRef.current;
+    if (!el) return;
 
-      transformerRef.current.getLayer()?.batchDraw();
-    }
-  }, [selectedElementId]);
+    const update = () => {
+      const rect = el.getBoundingClientRect();
+      // guard against 0-sized container during layout
+      setSize({
+        width: Math.max(1, Math.floor(rect.width)),
+        height: Math.max(1, Math.floor(rect.height)),
+      });
+    };
+
+    update();
+
+    const ro = new ResizeObserver(() => update());
+    ro.observe(el);
+
+    return () => ro.disconnect();
+  }, []);
 
   return (
-    <Stage
-      width={window.innerWidth - 256}
-      height={window.innerHeight}
-      onMouseDown={(e) => {
-        if (e.target === e.target.getStage()) {
-          selectElement(null);
-        }
-      }}
-    >
-      <Layer>
-        {currentSlide?.elements.map(
-          (el) => {
-            const isSelected =
-              selectedElementId === el.id;
+    <div ref={containerRef} className="w-full h-full">
+      
+        <AnimatePresence mode="wait">
+  <motion.div
+    key={currentSlideId}
 
-            if (el.type === "text") {
-              return (
-                <Text
-                  key={el.id}
-                  ref={
-                    isSelected
-                      ? selectedNodeRef
-                      : null
-                  }
-                  text={el.text || ""}
-                  x={el.x}
-                  y={el.y}
-                  width={el.width}
-                  height={el.height}
-                  scaleX={el.scaleX}
-                  scaleY={el.scaleY}
-                  fontSize={24}
-                  draggable
-                  onClick={() =>
-                    selectElement(el.id)
-                  }
-                  onTap={() =>
-                    selectElement(el.id)
-                  }
-                  onDragEnd={(e) => {
-                    updateElementPosition(
-                      el.id,
-                      e.target.x(),
-                      e.target.y()
-                    );
-                  }}
-                  onTransformEnd={(e) => {
-                    const node: any = e.target as any;
-
-
-                    updateElementSize(
-                      el.id,
-                      (node as any).width(),
-
-                      (node as any).height(),
-                      (node as any).scaleX(),
-                      (node as any).scaleY()
-
-                    );
-                  }}
-                />
-              );
-            }
-
-            if (el.type === "image") {
-              return (
-                <ImageElement
-                  key={el.id}
-                  refProp={
-                    isSelected
-                      ? selectedNodeRef
-                      : null
-                  }
-                  src={el.src || ""}
-                  x={el.x}
-                  y={el.y}
-                  width={
-                    el.width || 200
-                  }
-                  height={
-                    el.height || 200
-                  }
-                  scaleX={
-                    el.scaleX || 1
-                  }
-                  scaleY={
-                    el.scaleY || 1
-                  }
-                  onClick={() =>
-                    selectElement(el.id)
-                  }
-                  onDragEnd={(x, y) => {
-                    updateElementPosition(
-                      el.id,
-                      x,
-                      y
-                    );
-                  }}
-                  onTransformEnd={(
-                    node
-                  ) => {
-                    updateElementSize(
-                      el.id,
-                      (node as any).width(),
-                      (node as any).height(),
-                      (node as any).scaleX(),
-                      (node as any).scaleY()
-                    );
-                  }}
-                />
-              );
-            }
-            if (el.type === "button") {
-  return (
-    <>
-      <Rect
-        ref={
-          isSelected
-            ? selectedNodeRef
-            : null
-        }
-        x={el.x}
-        y={el.y}
-        width={el.width}
-        height={el.height}
-        fill="#3B82F6"
-        cornerRadius={8}
-        draggable
-        scaleX={el.scaleX}
-        scaleY={el.scaleY}
-        onClick={() => {
-  if (
-    previewMode &&
-    el.targetSlideId
-  ) {
-    setCurrentSlide(
-      el.targetSlideId
-    );
-
-    return;
-  }
-
-  selectElement(el.id);
-}}
-        onTap={() => {
-  if (
-    previewMode &&
-    el.targetSlideId
-  ) {
-    setCurrentSlide(
-      el.targetSlideId
-    );
-
-    return;
-  }
-
-  selectElement(el.id);
-}}
-        onDragEnd={(e) => {
-          updateElementPosition(
-            el.id,
-            e.target.x(),
-            e.target.y()
-          );
-        }}
-        onTransformEnd={(e) => {
-          const node = e.target;
-
-          updateElementSize(
-            el.id,
-            node.width(),
-            node.height(),
-            node.scaleX(),
-            node.scaleY()
-          );
-        }}
-      />
-
-      <Text
-        text={el.text || ""}
-        x={el.x}
-        y={el.y + 15}
-        width={el.width}
-        align="center"
-        fill="white"
-        listening={false}
-      />
-    </>
-  );
-}
-
-            return null;
+    initial={
+      activeTransition ===
+      "fade"
+        ? {
+            opacity: 0,
           }
-        )}
+        : activeTransition ===
+          "slide-left"
+        ? {
+            x: 300,
+            opacity: 0,
+          }
+        : activeTransition ===
+          "slide-right"
+        ? {
+            x: -300,
+            opacity: 0,
+          }
+        : activeTransition ===
+          "zoom"
+        ? {
+            scale: 0.8,
+            opacity: 0,
+          }
+        : {}
+    }
 
-        {selectedElementId && (
-          <Transformer
-            ref={transformerRef}
-          />
-        )}
-        
-      </Layer>
-    </Stage>
+    animate={{
+      x: 0,
+      y: 0,
+      scale: 1,
+      opacity: 1,
+    }}
+
+    exit={
+      activeTransition ===
+      "fade"
+        ? {
+            opacity: 0,
+          }
+        : activeTransition ===
+          "slide-left"
+        ? {
+            x: -300,
+            opacity: 0,
+          }
+        : activeTransition ===
+          "slide-right"
+        ? {
+            x: 300,
+            opacity: 0,
+          }
+        : activeTransition ===
+          "zoom"
+        ? {
+            scale: 1.2,
+            opacity: 0,
+          }
+        : {}
+    }
+
+    transition={{
+      duration: 0.4,
+    }}
+
+    style={{
+      width: "100%",
+      height: "100%",
+    }}
+  >
+    <Stage
+        width={size.width}
+        height={size.height}
+        onMouseDown={(e) => {
+          if (e.target === e.target.getStage()) selectNode(null);
+        }}
+      >
+    <CanvasRenderer
+      nodes={
+        currentSlide?.nodes ||
+        []
+      }
+
+      selectedNodeId={
+        selectedNodeId
+      }
+
+      selectNode={selectNode}
+
+      updateNode={updateNode}
+
+      previewMode={
+        previewMode
+      }
+
+      setCurrentSlide={
+        setCurrentSlide
+      }
+
+      setActiveTransition={
+        setActiveTransition
+      }
+    />
+ 
+      </Stage>
+       </motion.div>
+</AnimatePresence>
+    </div>
   );
 }
+
+
