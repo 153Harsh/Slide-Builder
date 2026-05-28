@@ -13,11 +13,21 @@ interface Props {
   setActiveTransition: (
   transition: string
 ) => void;
-  selectedNodeId: string | null;
+  selectedNodeIds: string[];
 
   selectNode: (
-    id: string | null
-  ) => void;
+  id: string
+) => void;
+
+setSelectedNodes: (
+  ids: string[]
+) => void;
+
+toggleNodeSelection: (
+  id: string
+) => void;
+
+clearSelection: () => void;
 
   updateNode: (
     id: string,
@@ -36,7 +46,7 @@ export default function CanvasRenderer({
   setActiveTransition,
   nodes,
 
-  selectedNodeId,
+  selectedNodeIds,
 
   selectNode,
 
@@ -45,30 +55,41 @@ export default function CanvasRenderer({
   previewMode,
 
   setCurrentSlide,
+  toggleNodeSelection,
   
 }: Props) {
   const transformerRef =
     useRef<any>(null);
 
-  const selectedNodeRef =
-    useRef<any>(null);
+ const nodeRefs = useRef<
+  Record<string, any>
+>({});
+    
 
   useEffect(() => {
-    if (!selectedNodeId) {
-      return;
-    }
+  const transformer =
+    transformerRef.current;
 
-    const transformer = transformerRef.current;
-    const selectedNode = selectedNodeRef.current;
+  if (!transformer) {
+    return;
+  }
 
-    if (!transformer || !selectedNode) {
-      return;
-    }
+  const selectedNodes =
+    selectedNodeIds
+      .map(
+        (id) =>
+          nodeRefs.current[id]
+      )
+      .filter(Boolean);
 
-    // Attach transformer to the selected konva node
-    transformer.nodes([selectedNode]);
-    transformer.getLayer()?.batchDraw();
-  }, [selectedNodeId]);
+  transformer.nodes(
+    selectedNodes
+  );
+
+  transformer
+    .getLayer()
+    ?.batchDraw();
+}, [selectedNodeIds]);
 
   return (
     <Layer>
@@ -86,8 +107,9 @@ export default function CanvasRenderer({
           registryItem.component as any;
 
         const isSelected =
-          selectedNodeId ===
-          node.id;
+  selectedNodeIds.includes(
+    node.id
+  );
 
         return (
           <Component
@@ -96,11 +118,13 @@ export default function CanvasRenderer({
 }
             key={node.id}
             node={node}
-            refProp={
-              isSelected
-                ? selectedNodeRef
-                : null
-            }
+            refProp={(ref: any) => {
+  if (ref) {
+    nodeRefs.current[
+      node.id
+    ] = ref;
+  }
+}}
             isSelected={
               isSelected
             }
@@ -110,11 +134,17 @@ export default function CanvasRenderer({
             setCurrentSlide={
               setCurrentSlide
             }
-            onSelect={() =>
-              selectNode(
-                node.id
-              )
-            }
+            onSelect={(e: any) => {
+  if (
+    e?.evt?.shiftKey
+  ) {
+    toggleNodeSelection(
+      node.id
+    );
+  } else {
+    selectNode(node.id);
+  }
+}}
             onChange={(
               updates: any
             ) => {
@@ -127,7 +157,7 @@ export default function CanvasRenderer({
         );
       })}
 
-      {selectedNodeId && (
+      {selectedNodeIds && (
         <Transformer
           ref={transformerRef}
         />
